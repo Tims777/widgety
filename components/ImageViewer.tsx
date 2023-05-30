@@ -1,6 +1,11 @@
-import { useContext, useEffect } from "preact/hooks";
-import { Component, createRef } from "preact";
-import { Dimension } from "../math/vector.ts";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "preact/hooks";
+import { Component } from "preact";
+import exifr from "exifr";
 import { CursorContext } from "./CursorContext.tsx";
 
 interface ImageViewerProps {
@@ -8,8 +13,6 @@ interface ImageViewerProps {
 }
 
 export default class ImageViewer extends Component<ImageViewerProps> {
-  private canvasRef = createRef<HTMLCanvasElement>();
-
   state = {
     width: 500,
     height: 500,
@@ -17,52 +20,52 @@ export default class ImageViewer extends Component<ImageViewerProps> {
 
   public render(props: ImageViewerProps) {
     const cursor = useContext(CursorContext);
+    const [url, setUrl] = useState<string>();
+
+    const setImage = useCallback(
+      (imageUrl: string) =>
+        setUrl((current) => {
+          if (current) URL.revokeObjectURL(current);
+          return imageUrl;
+        }),
+      [],
+    );
 
     useEffect(() => {
-      // Decode the selected image and render it to the canvas, but only after an initial delay has passed.
-      // This is to compensate for high frequencies of selection changes, when the user holds down an arrow key.
-      const initialDelay = 25;
-      let imageWorker: Worker | undefined;
-      const timeoutId = setTimeout(() => {
-        if (!props.files || !props.files.length) return;
-        imageWorker = new Worker("/workers/decode-image.js");
-        imageWorker.onmessage = (e) => this.renderImage(e.data);
-        imageWorker.postMessage(props.files[cursor.value]);
-      }, initialDelay);
+      setUrl(undefined);
+      const currentFile = props.files?.[cursor.value];
 
-      return () => {
-        clearTimeout(timeoutId);
-        imageWorker?.terminate();
-      };
-    }, [props.files, cursor]);
+      if (currentFile) {
+        const controller = new AbortController();
+
+        exifr.thumbnail(currentFile).then((t) => {
+          if (controller.signal.aborted) return;
+          const imageUrl = URL.createObjectURL(new Blob(t ? [t] : undefined));
+          controller.signal.onabort = () => URL.revokeObjectURL(imageUrl);
+          setImage(imageUrl);
+        });
+
+        setTimeout(() => {
+          if (controller.signal.aborted) return;
+          const imageUrl = URL.createObjectURL(currentFile);
+          controller.signal.onabort = () => URL.revokeObjectURL(imageUrl);
+          const image = new Image();
+          image.src = imageUrl;
+          image.decode().then(() => {
+            if (controller.signal.aborted) return;
+            setImage(imageUrl);
+          });
+        }, 100);
+
+        return () => controller.abort();
+      }
+    }, [cursor.value]);
 
     return (
-      <canvas
-        ref={this.canvasRef}
-        width={this.state.width}
+      <img
+        src={url}
         height={this.state.height}
       />
-    );
-  }
-
-  private renderImage(image: CanvasImageSource) {
-    const canvas = this.canvasRef.current;
-    const context = canvas?.getContext("2d");
-    if (!canvas || !context) return;
-    const imageDim = Dimension.of(image);
-    const canvasDim = Dimension.of(canvas);
-    const scale = canvasDim.div(imageDim).min();
-    const scaledImageDim = imageDim.mul(scale);
-    const padding = canvasDim.sub(scaledImageDim).div(2);
-    context.clearRect(0, 0, canvasDim.x, canvasDim.y);
-    context.imageSmoothingEnabled = true;
-    context.imageSmoothingQuality = "high";
-    context.drawImage(
-      image,
-      padding.x,
-      padding.y,
-      scaledImageDim.x,
-      scaledImageDim.y,
     );
   }
 }

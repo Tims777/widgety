@@ -13,28 +13,26 @@ const respInit = {
 
 const files = [...walkSync("./pages", { includeDirs: false })];
 const pages = files.map((w) =>
-  /^pages(\/.*).tsx$/.exec(w.path.replaceAll(SEP, posix.sep))?.[1]
+  /^pages\/(.*).tsx$/.exec(w.path.replaceAll(SEP, posix.sep))?.[1]
 );
 
 console.time("Build");
 const assets = await build(["utils/load.ts", ...files.map((w) => w.path)]);
 console.timeEnd("Build");
 
-const handler: Handler = (req) => {
-  const pathname = new URL(req.url).pathname.replace(/\/$/, "");
+function renderPage(page: string) {
+  return "<!doctype html>" + renderToString(h(App, { page }));
+}
 
+const handler: Handler = (req) => {
+  const pathname = new URL(req.url).pathname;
   if (assets.has(pathname)) {
     return new Response(assets.get(pathname), respInit.js);
   }
 
-  if (pathname == "") {
-    const html = renderToString(h(App, { page: "__default" }));
-    return new Response(html, respInit.html);
-  }
-
-  if (pages.indexOf(pathname) >= 0) {
-    const html = renderToString(h(App, { page: pathname.replace(/^\//, "") }));
-    return new Response(html, respInit.html);
+  const pagename = pathname.replace(/\/$/, "/__default").replace(/^\//, "");
+  if (pages.indexOf(pagename) >= 0) {
+    return new Response(renderPage(pagename), respInit.html);
   }
 
   return new Response(null, { status: 404 });
