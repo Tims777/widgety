@@ -44,7 +44,7 @@ export default async function build_js(
   const files = new Map<string, Uint8Array>();
   for (const output of result.outputFiles) {
     const path = toFileUrl(output.path.replace(workingDir, ""));
-    files.set(path.pathname.replace(/^\//, ""), output.contents);
+    files.set(path.pathname, output.contents);
   }
   return files;
 }

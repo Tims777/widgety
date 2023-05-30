@@ -6,7 +6,7 @@ export interface AppProps {
 
 export default function App(props: AppProps) {
   const loadPage =
-    `import load from "./js/utils/load.js"; load("${props.page}");`;
+    `import load from "/js/utils/load.js"; load("${props.page}");`;
   return (
     <html>
       <head>

@@ -2,6 +2,7 @@ import { type Handler, serve } from "std/http/server.ts";
 import { walkSync } from "std/fs/walk.ts";
 import { renderToString } from "preact-render-to-string";
 import { h } from "preact";
+import { posix, SEP } from "std/path/mod.ts";
 import App from "./app.tsx";
 import build from "./utils/build.ts";
 
@@ -11,26 +12,32 @@ const respInit = {
 };
 
 const files = [...walkSync("./pages", { includeDirs: false })];
-const pages = files.map((w) => w.name.replace(/.tsx$/, ""));
+const pages = files.map((w) =>
+  /^pages(\/.*).tsx$/.exec(w.path.replaceAll(SEP, posix.sep))?.[1]
+);
 
 console.time("Build");
 const assets = await build(["utils/load.ts", ...files.map((w) => w.path)]);
 console.timeEnd("Build");
 
 const handler: Handler = (req) => {
-  const pathname = new URL(req.url).pathname.replace(/^\//, "");
-  if (pathname.length == 0) {
+  const pathname = new URL(req.url).pathname;
+
+  if (assets.has(pathname)) {
+    return new Response(assets.get(pathname), respInit.js);
+  }
+
+  if (pathname == "/") {
     const html = renderToString(h(App, { page: "__default" }));
     return new Response(html, respInit.html);
   }
-  if (assets.has(pathname)) {
-    return new Response(assets.get(pathname), respInit.js);
-  } else if (pages.indexOf(pathname) >= 0) {
-    const html = renderToString(h(App, { page: pathname }));
+
+  if (pages.indexOf(pathname) >= 0) {
+    const html = renderToString(h(App, { page: pathname.replace(/^\//, "") }));
     return new Response(html, respInit.html);
-  } else {
-    return new Response(null, { status: 404 });
   }
+
+  return new Response(null, { status: 404 });
 };
 
 if (import.meta.main) {

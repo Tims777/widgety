@@ -6,10 +6,10 @@ export default function Header() {
           <a href="/">Start Page</a>
         </li>
         <li>
-          <a href="page1">Page 1</a>
+          <a href="/page1">Page 1</a>
         </li>
         <li>
-          <a href="page2">Page 2</a>
+          <a href="/page2">Page 2</a>
         </li>
       </ul>
     </header>
