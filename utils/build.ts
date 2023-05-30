@@ -3,6 +3,8 @@ import { build } from "esbuild";
 import { denoPlugins } from "esbuild_deno_loader";
 import { toFileUrl } from "std/path/mod.ts";
 
+const workingDir = Deno.cwd();
+
 const optimizationOptions = {
   treeShaking: true,
   minify: true,
@@ -12,10 +14,11 @@ const optimizationOptions = {
 const bundlingOptions = {
   bundle: true,
   splitting: true,
-  write: true,
+  write: false,
   metafile: true,
   format: "esm",
   outdir: "./js",
+  absWorkingDir: workingDir,
 } as const;
 
 const jsxOptions = {
@@ -31,11 +34,17 @@ const plugins = [...denoPlugins({ importMapURL })];
 export default async function build_js(
   entryPoints: Record<string, string> | string[],
 ) {
-  return await build({
+  const result = await build({
     ...optimizationOptions,
     ...bundlingOptions,
     ...jsxOptions,
     plugins,
     entryPoints,
   });
+  const files = new Map<string, Uint8Array>();
+  for (const output of result.outputFiles) {
+    const path = toFileUrl(output.path.replace(workingDir, ""));
+    files.set(path.pathname.replace(/^\//, ""), output.contents);
+  }
+  return files;
 }

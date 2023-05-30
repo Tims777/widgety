@@ -14,17 +14,17 @@ const files = [...walkSync("./pages", { includeDirs: false })];
 const pages = files.map((w) => w.name.replace(/.tsx$/, ""));
 
 console.time("Build");
-await build(["utils/load.ts", ...files.map((w) => w.path)]);
+const assets = await build(["utils/load.ts", ...files.map((w) => w.path)]);
 console.timeEnd("Build");
 
-const handler: Handler = async (req) => {
+const handler: Handler = (req) => {
   const pathname = new URL(req.url).pathname.replace(/^\//, "");
   if (pathname.length == 0) {
     const html = renderToString(h(App, { page: "__default" }));
     return new Response(html, respInit.html);
-  } else if (pathname.startsWith("js/")) {
-    const file = await Deno.open(`./${pathname}`);
-    return new Response(file.readable, respInit.js);
+  }
+  if (assets.has(pathname)) {
+    return new Response(assets.get(pathname), respInit.js);
   } else if (pages.indexOf(pathname) >= 0) {
     const html = renderToString(h(App, { page: pathname }));
     return new Response(html, respInit.html);
