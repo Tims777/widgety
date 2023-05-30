@@ -1,8 +1,16 @@
+import { useState } from "preact/hooks";
+
 export default function Page1() {
+  const [count, setCount] = useState(0);
   return (
     <>
       <h1>Page 1</h1>
-      <p>This page is for informational purposes only.</p>
+      <p>
+        Current count: <output value={count} />
+      </p>
+      <p>
+        <button onClick={() => setCount((c) => c + 1)}>+</button>
+      </p>
     </>
   );
 }

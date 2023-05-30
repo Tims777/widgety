@@ -1,6 +1,6 @@
-import { render } from "preact";
+import { h, render } from "preact";
 
 export default async function load(name: string) {
   const page = await import(`../pages/${name}.js`);
-  render(page.default(), document.getElementById("content")!);
+  render(h(page.default, {}), document.getElementById("content")!);
 }
