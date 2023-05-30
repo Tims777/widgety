@@ -7,15 +7,14 @@ const workingDir = Deno.cwd();
 
 const optimizationOptions = {
   treeShaking: true,
-  minify: true,
-  sourcemap: false,
+  minify: false,
+  sourcemap: true,
 } as const;
 
 const bundlingOptions = {
   bundle: true,
   splitting: true,
   write: false,
-  metafile: true,
   format: "esm",
   outdir: "./js",
   absWorkingDir: workingDir,

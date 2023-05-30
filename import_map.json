@@ -5,6 +5,7 @@
     "esbuild_deno_loader": "https://deno.land/x/esbuild_deno_loader@0.7.0/mod.ts",
     "preact-render-to-string": "https://esm.sh/*preact-render-to-string@6.0.3",
     "preact": "https://esm.sh/preact@10.15.1",
-    "preact/": "https://esm.sh/preact@10.15.1/"
+    "preact/": "https://esm.sh/preact@10.15.1/",
+    "supabase": "https://esm.sh/@supabase/supabase-js@2.24.0"
   }
 }

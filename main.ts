@@ -21,13 +21,13 @@ const assets = await build(["utils/load.ts", ...files.map((w) => w.path)]);
 console.timeEnd("Build");
 
 const handler: Handler = (req) => {
-  const pathname = new URL(req.url).pathname;
+  const pathname = new URL(req.url).pathname.replace(/\/$/, "");
 
   if (assets.has(pathname)) {
     return new Response(assets.get(pathname), respInit.js);
   }
 
-  if (pathname == "/") {
+  if (pathname == "") {
     const html = renderToString(h(App, { page: "__default" }));
     return new Response(html, respInit.html);
   }
