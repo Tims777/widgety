@@ -9,8 +9,8 @@ export default function App(props: AppProps) {
     <html>
       <head>
         <meta charSet="utf-8" />
-        <script type="module" dangerouslySetInnerHTML={{ __html: loadPage }}>
-        </script>
+        <script type="module" dangerouslySetInnerHTML={{ __html: loadPage }} />
+        <style>{"html, body, main, div { padding: 0; margin: 0; }"}</style>
       </head>
       <body>
         <main id="content" />

@@ -9,6 +9,8 @@ function keyOf(file: File) {
   return path;
 }
 
+const valueOf = keyOf;
+
 function promisify<T>(target: IDBRequest<T>) {
   return new Promise<T>((resolve, reject) => {
     target.onsuccess = () => resolve(target.result);
@@ -44,7 +46,7 @@ class ImageStagingService {
     const transaction = await this.beginTransaction("readwrite");
     if (stage) {
       return await promisify(
-        transaction.objectStore(storeName).put(file, keyOf(file)),
+        transaction.objectStore(storeName).put(valueOf(file), keyOf(file)),
       );
     } else {
       return await promisify(
@@ -63,6 +65,12 @@ class ImageStagingService {
     const transaction = await this.beginTransaction("readonly");
     const request = transaction.objectStore(storeName).getAll();
     return await promisify(request) as File[];
+  }
+
+  public async clear() {
+    const transaction = await this.beginTransaction("readwrite");
+    const request = transaction.objectStore(storeName).clear();
+    return await promisify(request);
   }
 
   public setDescription(file: File, description: string) {

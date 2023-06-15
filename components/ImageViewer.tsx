@@ -1,59 +1,104 @@
-import {
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-} from "preact/hooks";
+import { useContext, useEffect, useRef } from "preact/hooks";
 import { Component } from "preact";
-import exifr from "exifr";
 import { CursorContext } from "./CursorContext.tsx";
+import { thumbnail } from "../utils/thumbnail.ts";
+import { Dimension } from "../math/vector.ts";
 
-interface ImageViewerProps {
+type Callback<T = void> = () => T;
+
+function useAbortController(): [AbortController, (cb: Callback) => number] {
+  const controller = new AbortController();
+  const callbacks: Callback[] = [];
+  const onAbort = (cb: Callback) => callbacks.push(cb);
+  controller.signal.onabort = () => callbacks.forEach((cb) => cb());
+  return [controller, onAbort];
+}
+
+export interface ImageViewerProps {
   files?: File[];
 }
 
 export default class ImageViewer extends Component<ImageViewerProps> {
-  state = {
-    width: 500,
-    height: 500,
-  };
-
   public render(props: ImageViewerProps) {
     const cursor = useContext(CursorContext);
-    const [url, setUrl] = useState<string>();
+    const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    const setImage = useCallback(
-      (imageUrl: string) =>
-        setUrl((current) => {
-          if (current) URL.revokeObjectURL(current);
-          return imageUrl;
-        }),
-      [],
-    );
+    const drawImage = (img?: HTMLImageElement, rot?: number) => {
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext("2d");
+      if (!canvas || !ctx) return;
+
+      const canvasSize = Dimension.of(canvas);
+      const canvasCenter = canvasSize.mul(.5);
+
+      ctx.setTransform();
+      ctx.clearRect(
+        0,
+        0,
+        canvasSize.x,
+        canvasSize.y,
+      );
+
+      if (img) {
+        const actualSize = Dimension.of(img);
+        const scale = canvasSize.div(actualSize).min();
+        const imageSize = actualSize.mul(scale);
+        const imageCenter = imageSize.mul(.5);
+        ctx.translate(canvasCenter.x, canvasCenter.y);
+        ctx.rotate((rot ?? 0) * Math.PI / 180);
+        ctx.drawImage(
+          img,
+          -imageCenter.x,
+          -imageCenter.y,
+          imageSize.x,
+          imageSize.y,
+        );
+      }
+    };
 
     useEffect(() => {
-      setUrl(undefined);
+      const rescaleCanvas = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+      };
+      window.onresize = rescaleCanvas;
+      rescaleCanvas();
+    }, []);
+
+    useEffect(() => {
+      drawImage(undefined);
+
       const currentFile = props.files?.[cursor.value];
 
       if (currentFile) {
-        const controller = new AbortController();
+        const [controller, onAbort] = useAbortController();
 
-        exifr.thumbnail(currentFile).then((t) => {
-          if (controller.signal.aborted) return;
-          const imageUrl = URL.createObjectURL(new Blob(t ? [t] : undefined));
-          controller.signal.onabort = () => URL.revokeObjectURL(imageUrl);
-          setImage(imageUrl);
-        });
+        thumbnail(currentFile)
+          .then(([thumb, rot]) => {
+            if (controller.signal.aborted) return;
+            const imageUrl = URL.createObjectURL(
+              new Blob(thumb ? [thumb] : []),
+            );
+            onAbort(() => URL.revokeObjectURL(imageUrl));
+            const image = new Image();
+            image.src = imageUrl;
+            image.decode().then(() => {
+              if (controller.signal.aborted) return;
+              drawImage(image, rot);
+            });
+          });
 
         setTimeout(() => {
           if (controller.signal.aborted) return;
           const imageUrl = URL.createObjectURL(currentFile);
-          controller.signal.onabort = () => URL.revokeObjectURL(imageUrl);
+          onAbort(() => URL.revokeObjectURL(imageUrl));
           const image = new Image();
           image.src = imageUrl;
           image.decode().then(() => {
             if (controller.signal.aborted) return;
-            setImage(imageUrl);
+            drawImage(image);
           });
         }, 100);
 
@@ -61,11 +106,6 @@ export default class ImageViewer extends Component<ImageViewerProps> {
       }
     }, [cursor.value]);
 
-    return (
-      <img
-        src={url}
-        height={this.state.height}
-      />
-    );
+    return <canvas ref={canvasRef} style="width:100%; height:100%;" />;
   }
 }
