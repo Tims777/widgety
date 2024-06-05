@@ -1,7 +1,14 @@
-import { default as config } from "../deno.json" assert { type: "json" };
-import { build } from "esbuild";
-import { denoPlugins } from "esbuild_deno_loader";
-import { toFileUrl } from "std/path/mod.ts";
+import { build as esbuild } from "https://deno.land/x/esbuild@v0.17.19/mod.js";
+import { denoPlugins } from "https://deno.land/x/esbuild_deno_loader@0.7.0/mod.ts";
+import { toFileUrl } from "https://deno.land/std@0.189.0/path/mod.ts";
+
+export interface DenoConfig {
+  importMap: string;
+  compilerOptions: {
+    jsx: string;
+    jsxImportSource: string;
+  };
+}
 
 const workingDir = Deno.cwd();
 
@@ -17,29 +24,28 @@ const bundlingOptions = {
   write: false,
   format: "esm",
   outdir: "./js",
-  absWorkingDir: workingDir,
+  absWorkingDir: Deno.cwd(),
 } as const;
 
-const jsxOptions = {
-  jsx: "automatic",
-  jsxImportSource: config.compilerOptions.jsxImportSource,
-} as const;
-
-const importMapURL = toFileUrl(await Deno.realPath(config.importMap))
-  .toString();
-
-const plugins = [...denoPlugins({ importMapURL })];
-
-export default async function build_js(
+export default async function build(
   entryPoints: Record<string, string> | string[],
+  config: DenoConfig,
 ) {
-  const result = await build({
+  const jsx = "automatic";
+  const jsxImportSource = config.compilerOptions.jsxImportSource;
+  const importMapURL = toFileUrl(await Deno.realPath(config.importMap))
+    .toString();
+  const plugins = [...denoPlugins({ importMapURL })];
+
+  const result = await esbuild({
     ...optimizationOptions,
     ...bundlingOptions,
-    ...jsxOptions,
+    jsx,
+    jsxImportSource,
     plugins,
     entryPoints,
   });
+
   const files = new Map<string, Uint8Array>();
   for (const output of result.outputFiles) {
     const path = toFileUrl(output.path.replace(workingDir, ""));
