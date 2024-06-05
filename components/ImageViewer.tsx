@@ -1,14 +1,19 @@
-import {
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-} from "preact/hooks";
+import { useContext, useEffect, useState } from "preact/hooks";
 import { Component } from "preact";
-import exifr from "exifr";
 import { CursorContext } from "./CursorContext.tsx";
+import { thumbnail } from "../utils/thumbnail.ts";
 
-interface ImageViewerProps {
+type Callback<T = void> = () => T;
+
+function useAbortController(): [AbortController, (cb: Callback) => number] {
+  const controller = new AbortController();
+  const callbacks: Callback[] = [];
+  const onAbort = (cb: Callback) => callbacks.push(cb);
+  controller.signal.onabort = () => callbacks.forEach((cb) => cb());
+  return [controller, onAbort];
+}
+
+export interface ImageViewerProps {
   files?: File[];
 }
 
@@ -21,39 +26,38 @@ export default class ImageViewer extends Component<ImageViewerProps> {
   public render(props: ImageViewerProps) {
     const cursor = useContext(CursorContext);
     const [url, setUrl] = useState<string>();
-
-    const setImage = useCallback(
-      (imageUrl: string) =>
-        setUrl((current) => {
-          if (current) URL.revokeObjectURL(current);
-          return imageUrl;
-        }),
-      [],
-    );
+    const [rotation, setRotation] = useState(0);
 
     useEffect(() => {
       setUrl(undefined);
+      setRotation(0);
+
       const currentFile = props.files?.[cursor.value];
 
       if (currentFile) {
-        const controller = new AbortController();
+        const [controller, onAbort] = useAbortController();
 
-        exifr.thumbnail(currentFile).then((t) => {
-          if (controller.signal.aborted) return;
-          const imageUrl = URL.createObjectURL(new Blob(t ? [t] : undefined));
-          controller.signal.onabort = () => URL.revokeObjectURL(imageUrl);
-          setImage(imageUrl);
-        });
+        thumbnail(currentFile)
+          .then(([thumb, rot]) => {
+            if (controller.signal.aborted) return;
+            const imageUrl = URL.createObjectURL(
+              new Blob(thumb ? [thumb] : []),
+            );
+            onAbort(() => URL.revokeObjectURL(imageUrl));
+            setUrl(imageUrl);
+            setRotation(rot);
+          });
 
         setTimeout(() => {
           if (controller.signal.aborted) return;
           const imageUrl = URL.createObjectURL(currentFile);
-          controller.signal.onabort = () => URL.revokeObjectURL(imageUrl);
+          onAbort(() => URL.revokeObjectURL(imageUrl));
           const image = new Image();
           image.src = imageUrl;
           image.decode().then(() => {
             if (controller.signal.aborted) return;
-            setImage(imageUrl);
+            setUrl(imageUrl);
+            setRotation(0);
           });
         }, 100);
 
@@ -65,6 +69,7 @@ export default class ImageViewer extends Component<ImageViewerProps> {
       <img
         src={url}
         height={this.state.height}
+        style={`transform: rotate(${rotation}deg)`}
       />
     );
   }
