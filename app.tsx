@@ -1,5 +1,3 @@
-import Header from "./components/Header.tsx";
-
 export interface AppProps {
   page: string;
 }
@@ -15,7 +13,6 @@ export default function App(props: AppProps) {
         </script>
       </head>
       <body>
-        <Header />
         <main id="content" />
       </body>
     </html>
